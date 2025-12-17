@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Jeopardy Buzzer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      background: #0f172a;
+      color: #e5e7eb;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    input {
+      font-size: 18px;
+      padding: 10px;
+      margin-bottom: 20px;
+      width: 220px;
+      text-align: center;
+      border-radius: 8px;
+      border: none;
+    }
+
+    button {
+      font-size: 32px;
+      padding: 30px 60px;
+      border-radius: 16px;
+      border: none;
+      cursor: pointer;
+      background: #22c55e;
+      color: black;
+    }
+
+    button:disabled {
+      background: #475569;
+      cursor: not-allowed;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🔔 Jeopardy Buzzer</h1>
+
+  <input id="name" placeholder="Dein Name">
+
+  <button id="buzzBtn" disabled>BUZZ!</button>
+
+  <div id="status">Warte auf Freigabe…</div>
+
+  <!-- Firebase SDKs (NICHT ändern!) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+  <script>
+    // 🔥 Firebase Projekt-Konfiguration
+    const firebaseConfig = {
+      apiKey: "AIzaSyCiuYIzIkUbuKvJfexM3__5YU19WIDK8mE",
+      authDomain: "madsnackquiz.firebaseapp.com",
+      databaseURL: "https://madsnackquiz-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "madsnackquiz",
+      storageBucket: "madsnackquiz.firebasestorage.app",
+      messagingSenderId: "251069550894",
+      appId: "1:251069550894:web:a35b686d3d3c85913beabf"
+    };
+
+    // Firebase initialisieren
+    firebase.initializeApp(firebaseConfig);
+
+    const db = firebase.database();
+    const buzzerRef = db.ref("buzzer");
+
+    const buzzBtn = document.getElementById("buzzBtn");
+    const statusDiv = document.getElementById("status");
+    const nameInput = document.getElementById("name");
+
+    // 🔁 Realtime Listener (robust!)
+    buzzerRef.on("value", snapshot => {
+      const data = snapshot.val() || {};
+
+      const active = data.active === true;
+      const winner = data.winner || "";
+
+      if (active && winner === "") {
+        buzzBtn.disabled = false;
+        statusDiv.textContent = "BUZZER FREI!";
+      } else {
+        buzzBtn.disabled = true;
+
+        if (winner !== "") {
+          statusDiv.textContent = "❌ Zu spät!";
+        } else {
+          statusDiv.textContent = "Warte auf Freigabe…";
+        }
+      }
+    });
+
+    // 🔔 Buzz-Button
+    buzzBtn.addEventListener("click", () => {
+      const name = nameInput.value.trim();
+
+      if (!name) {
+        alert("Bitte Namen eingeben!");
+        return;
+      }
+
+      buzzerRef.transaction(current => {
+        if (
+          current &&
+          current.active === true &&
+          (current.winner === "" || current.winner === undefined)
+        ) {
+          return {
+            active: false,
+            winner: name,
+            timestamp: Date.now()
+          };
+        }
+        return; // verloren
+      });
+    });
+  </script>
+
+</body>
+</html>
