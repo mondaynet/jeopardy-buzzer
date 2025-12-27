@@ -32,6 +32,18 @@
       border: none;
     }
 
+    textarea {
+      font-size: 16px;
+      padding: 10px;
+      margin-bottom: 20px;
+      width: 280px;
+      height: 90px;
+      text-align: left;
+      border-radius: 8px;
+      border: none;
+      resize: vertical;
+    }
+
     button {
       font-size: 32px;
       padding: 30px 60px;
@@ -51,6 +63,22 @@
       margin-top: 20px;
       font-size: 18px;
     }
+
+    #releasedWrap {
+      display: none;
+      margin-top: 16px;
+      background: #1e293b;
+      padding: 12px 16px;
+      border-radius: 12px;
+      max-width: 320px;
+      text-align: center;
+    }
+
+    #releasedTitle {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
   </style>
 </head>
 <body>
@@ -61,7 +89,14 @@
 
   <button id="buzzBtn" disabled>BUZZ!</button>
 
+  <textarea id="note" placeholder="Antwort (nur Host bis Freigabe sichtbar)"></textarea>
+
   <div id="status">Warte auf Freigabe…</div>
+
+  <div id="releasedWrap">
+    <div id="releasedTitle">Freigegeben:</div>
+    <div id="releasedText"></div>
+  </div>
 
   <!-- Firebase SDKs (NICHT ändern!) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -88,6 +123,33 @@
     const buzzBtn = document.getElementById("buzzBtn");
     const statusDiv = document.getElementById("status");
     const nameInput = document.getElementById("name");
+    const noteInput = document.getElementById("note");
+    const releasedWrap = document.getElementById("releasedWrap");
+    const releasedText = document.getElementById("releasedText");
+
+    let noteTimer = null;
+
+    function pushNote() {
+      const name = nameInput.value.trim();
+      if (!name) {
+        return;
+      }
+      const text = noteInput.value.trim();
+      if (!text) {
+        buzzerRef.child("notes").child(name).remove();
+        return;
+      }
+      buzzerRef.child("notes").child(name).set(text);
+    }
+
+    noteInput.addEventListener("input", () => {
+      if (noteTimer) {
+        clearTimeout(noteTimer);
+      }
+      noteTimer = setTimeout(pushNote, 300);
+    });
+
+    nameInput.addEventListener("change", pushNote);
 
     // 🔁 Realtime Listener (robust!)
     buzzerRef.on("value", snapshot => {
@@ -95,6 +157,9 @@
 
       const active = data.active === true;
       const winner = data.winner || "";
+      const notesVisible = data.notes_visible === true;
+      const releasedName = data.notes_released_name || "";
+      const notes = data.notes || {};
 
       if (active && winner === "") {
         buzzBtn.disabled = false;
@@ -108,6 +173,15 @@
           statusDiv.textContent = "Warte auf Freigabe…";
         }
       }
+
+      if (notesVisible && releasedName) {
+        const noteText = notes[releasedName] || "";
+        releasedText.textContent = noteText ? `${releasedName}: ${noteText}` : `${releasedName}: -`;
+        releasedWrap.style.display = "block";
+      } else {
+        releasedText.textContent = "";
+        releasedWrap.style.display = "none";
+      }
     });
 
     // 🔔 Buzz-Button
@@ -120,16 +194,16 @@
       }
 
       buzzerRef.transaction(current => {
+        const base = current || {};
         if (
-          current &&
-          current.active === true &&
-          (current.winner === "" || current.winner === undefined)
+          base.active === true &&
+          (base.winner === "" || base.winner === undefined)
         ) {
-          return {
+          return Object.assign({}, base, {
             active: false,
             winner: name,
             timestamp: Date.now()
-          };
+          });
         }
         return; // verloren
       });
